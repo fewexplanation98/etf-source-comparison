@@ -1,0 +1,32 @@
+name: Run ETF source comparison
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run script
+        run: npm start
+
+      - name: Upload output
+        uses: actions/upload-artifact@v4
+        with:
+          name: msci-world-results
+          path: output/
