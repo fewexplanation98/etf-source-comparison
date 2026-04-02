@@ -1,5 +1,5 @@
 const SUMMARY_PERIODS = ["1D", "1M", "3M", "YTD", "1Y", "3Y"];
-const CHART_PERIODS = ["1M", "3M", "YTD", "1Y", "3Y", "ALL"];
+const CHART_PERIODS = ["1D", "1M", "3M", "YTD", "1Y", "3Y", "ALL"];
 
 const state = {
   justetf: null,
@@ -235,7 +235,34 @@ function renderChart() {
     return;
   }
 
-  const filtered = getFilteredPoints(priceRow.points, state.selectedChartPeriod);
+function formatAxisLabel(value, period) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+
+  if (period === "1D") {
+    return d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit"
+  });
+}
+  
+ const rawPoints =
+  state.selectedChartPeriod === "1D"
+    ? (priceRow.intraday || [])
+    : (priceRow.points || []);
+
+const filtered =
+  state.selectedChartPeriod === "1D"
+    ? rawPoints
+    : getFilteredPoints(rawPoints, state.selectedChartPeriod);
 
   if (!filtered.length) {
     chartSubtitle.textContent = "No points available for selected period";
@@ -302,7 +329,7 @@ function renderChart() {
       "text-anchor": "middle",
       class: "axis-label"
     });
-    text.textContent = formatDateShort(point.date);
+    text.textContent = formatAxisLabel(point.date, state.selectedChartPeriod);
     priceChart.appendChild(text);
   });
 
