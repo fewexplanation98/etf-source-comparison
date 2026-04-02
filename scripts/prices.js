@@ -2,13 +2,22 @@ import fs from "fs/promises";
 import path from "path";
 
 const ETFS = [
- { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
+  { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
+
+  // ⚠️ FIXATI
   { name: "MSCI World Value", isin: "IE00BP3QZB59", ticker: "IWVL.L" },
-  { name: "Emerging Markets", isin: "IE00BKM4GZ66", ticker: "EIMI.MI" },
-  { name: "Gold", isin: "IE00B4ND3602", ticker: "IE00B4ND3602.IR" },
+  { name: "Emerging Markets", isin: "IE00BKM4GZ66", ticker: "EIMI.L" },
+  { name: "Gold", isin: "IE00B4ND3602", ticker: "SGLN.L" },
+
   { name: "Government Bond", isin: "IE00B14X4Q57", ticker: "IBGL.AS" },
+
+  // ⚠️ FIX
   { name: "Euro Corporate Bond", isin: "IE00B3F81R35", ticker: "IEAC.L" },
+
+  // ✅ QUESTO HAI TROVATO GIUSTO
   { name: "Defence Tech", isin: "IE000JCW3DZ3", ticker: "4MMR.DE" },
+
+  // ⚠️ FIX
   { name: "AI & Big Data", isin: "IE00BGV5VN51", ticker: "XAIX.DE" }
 ];
 
