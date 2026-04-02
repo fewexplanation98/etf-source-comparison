@@ -1,343 +1,238 @@
-import fs from "fs/promises";
-import path from "path";
-import { chromium } from "playwright";
-import yahooFinance from "yahoo-finance2";
-import config from "../etf.config.json" with { type: "json" };
+// justetf-periods-test.js
+// Step 1: test JustETF performance extraction for all your ETFs by ISIN
+// Output: console table + JSON file with 1D / 5D / 1M / 3M / YTD / 1Y / 3Y
 
-function pct(num) {
-  if (num === null || num === undefined || Number.isNaN(num)) return null;
-  return Number(num.toFixed(2));
+const fs = require('fs');
+const { chromium } = require('playwright');
+
+// Put your ISINs here
+const ISINS = [
+  // 'IE00B4L5Y983',
+  // 'IE00BK5BQT80',
+];
+
+const PERIOD_LABELS = {
+  '1D': ['1 day', '1D', '1 day %', '1 giorno'],
+  '5D': ['5 days', '5D', '5 days %', '5 giorni'],
+  '1M': ['1 month', '1M', '1 month %', '1 mese'],
+  '3M': ['3 months', '3M', '3 months %', '3 mesi'],
+  'YTD': ['YTD', 'year to date'],
+  '1Y': ['1 year', '1Y', '1 anno'],
+  '3Y': ['3 years', '3Y', '3 anni'],
+};
+
+function normalizeSpaces(str) {
+  return str.replace(/\s+/g, ' ').trim();
 }
 
-function calcPct(current, base) {
-  if (
-    current === null || current === undefined ||
-    base === null || base === undefined ||
-    Number.isNaN(current) || Number.isNaN(base) || base === 0
-  ) {
-    return null;
-  }
-  return ((current - base) / base) * 100;
-}
-
-function parseLocalizedNumber(text) {
+function parsePct(text) {
   if (!text) return null;
   const cleaned = text
-    .replace(/\s/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const num = Number(cleaned);
-  return Number.isFinite(num) ? num : null;
+    .replace(/\u2212/g, '-')
+    .replace(/,/g, '.')
+    .replace(/[^0-9+\-\.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const matches = cleaned.match(/[+\-]?\d+(?:\.\d+)?/g);
+  if (!matches || !matches.length) return null;
+
+  const value = Number(matches[matches.length - 1]);
+  return Number.isFinite(value) ? value : null;
 }
 
-async function ensureDir(dir) {
-  await fs.mkdir(dir, { recursive: true });
-}
-
-async function safeClickCookieButtons(page) {
-  const selectors = [
-    /accept/i,
-    /agree/i,
-    /consent/i,
-    /save/i,
-    /close/i,
-    /allow/i,
-    /ok/i
+async function acceptCookiesIfNeeded(page) {
+  const possibleButtons = [
+    'button:has-text("Accept")',
+    'button:has-text("Accept all")',
+    'button:has-text("I agree")',
+    'button:has-text("OK")',
+    'button:has-text("Alle akzeptieren")',
+    'button:has-text("Akzeptieren")',
   ];
 
-  for (const rx of selectors) {
+  for (const selector of possibleButtons) {
+    const btn = page.locator(selector).first();
     try {
-      const btn = page.getByRole("button", { name: rx }).first();
       if (await btn.isVisible({ timeout: 1200 })) {
-        await btn.click({ force: true });
-        await page.waitForTimeout(1500);
-        return true;
+        await btn.click({ timeout: 1200 });
+        await page.waitForTimeout(800);
+        return;
       }
-    } catch {}
+    } catch (_) {}
   }
-
-  return false;
 }
 
-async function scrapeJustETF(page, url) {
-  const result = {
-    source: "justETF",
-    values: {
-      "1D": null,
-      "1M": null,
-      "YTD": null
-    },
-    notes: []
-  };
+async function grabWholeText(page) {
+  return await page.evaluate(() => document.body.innerText || '');
+}
 
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(5000);
+function extractFromTextBlock(text) {
+  const normalized = normalizeSpaces(text);
+  const result = {};
 
-  await safeClickCookieButtons(page);
-
-  try {
-    const chartTitle = page.getByText(/chart/i).first();
-    await chartTitle.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(1500);
-  } catch {
-    result.notes.push("Could not scroll to Chart section");
-  }
-
-  await page.screenshot({
-    path: "output/justetf-debug-before.png",
-    fullPage: true
-  });
-
-  async function clickPeriod(period) {
-    const candidates = [
-      page.getByRole("button", { name: new RegExp(`^${period}$`, "i") }).first(),
-      page.getByText(new RegExp(`^${period}$`, "i")).first(),
-      page.locator(`text="${period}"`).first(),
-      page.locator(`button:has-text("${period}")`).first(),
-      page.locator(`[role="button"]:has-text("${period}")`).first(),
-      page.locator(`a:has-text("${period}")`).first()
-    ];
-
-    for (const candidate of candidates) {
-      try {
-        if (await candidate.isVisible({ timeout: 1500 })) {
-          await candidate.scrollIntoViewIfNeeded();
-          await page.waitForTimeout(500);
-          await candidate.click({ force: true, timeout: 5000 });
-          await page.waitForTimeout(3000);
-          return true;
-        }
-      } catch {}
-    }
-
-    return false;
-  }
-
-  async function extractVisibleLabelValue(labels = []) {
-    const bodyText = await page.locator("body").innerText();
+  for (const [period, labels] of Object.entries(PERIOD_LABELS)) {
+    let found = null;
 
     for (const label of labels) {
-      const rx = new RegExp(`${label}\\s*:?\\s*([+-]?\\d+(?:[.,]\\d+)?)%`, "i");
-      const m = bodyText.match(rx);
-      if (m) {
-        return Number(m[1].replace(",", "."));
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const patterns = [
+        new RegExp(`${escaped}\\s*([+\-−]?\\d+[\\.,]?\\d*\\s*%)`, 'i'),
+        new RegExp(`([+\-−]?\\d+[\\.,]?\\d*\\s*%)\\s*${escaped}`, 'i'),
+        new RegExp(`${escaped}[^+\-\d]{0,30}([+\-−]?\\d+[\\.,]?\\d*\\s*%)`, 'i'),
+      ];
+
+      for (const pattern of patterns) {
+        const match = normalized.match(pattern);
+        if (match?.[1]) {
+          found = parsePct(match[1]);
+          if (found !== null) break;
+        }
       }
+      if (found !== null) break;
     }
 
-    return null;
-  }
-
-  const mapping = [
-    { period: "1D", labels: ["1 day"] },
-    { period: "1M", labels: ["1 month"] },
-    { period: "YTD", labels: ["YTD"] }
-  ];
-
-  for (const item of mapping) {
-    const clicked = await clickPeriod(item.period);
-
-    if (!clicked) {
-      result.notes.push(`Could not click justETF period ${item.period}`);
-      continue;
-    }
-
-    await page.screenshot({
-      path: `output/justetf-${item.period}.png`,
-      fullPage: true
-    });
-
-    const value = await extractVisibleLabelValue(item.labels);
-
-    if (value === null) {
-      result.notes.push(`Could not extract justETF value for ${item.period}`);
-    } else {
-      result.values[item.period] = pct(value);
-    }
+    result[period] = found;
   }
 
   return result;
 }
 
-async function scrapeLS(page, url) {
-  const result = {
-    source: "L&S",
-    values: {
-      "1D": null,
-      "1M": null,
-      "YTD": null
-    },
-    raw: {
-      priceNow: null,
-      previousClose: null
-    },
-    notes: []
-  };
-
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(5000);
-
-  await page.screenshot({
-    path: "output/ls-debug.png",
-    fullPage: true
-  });
-
-  const bodyText = await page.locator("body").innerText();
-
-  const patterns = [
-    { key: "priceNow", regex: /(?:Last|Price|Current price|Bid|Ask)\s*[:\n ]\s*([0-9][0-9.,]*)/i },
-    { key: "previousClose", regex: /(?:Previous close|Close|Closing price)\s*[:\n ]\s*([0-9][0-9.,]*)/i }
-  ];
-
-  for (const p of patterns) {
-    const m = bodyText.match(p.regex);
-    if (m) {
-      result.raw[p.key] = parseLocalizedNumber(m[1]);
+async function extractUsingDom(page) {
+  return await page.evaluate((periodLabels) => {
+    function normalizeSpaces(str) {
+      return str.replace(/\s+/g, ' ').trim();
     }
-  }
 
-  result.values["1D"] = pct(calcPct(result.raw.priceNow, result.raw.previousClose));
+    function parsePct(text) {
+      if (!text) return null;
+      const cleaned = text
+        .replace(/\u2212/g, '-')
+        .replace(/,/g, '.')
+        .replace(/[^0-9+\-\.]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const matches = cleaned.match(/[+\-]?\d+(?:\.\d+)?/g);
+      if (!matches || !matches.length) return null;
+      const value = Number(matches[matches.length - 1]);
+      return Number.isFinite(value) ? value : null;
+    }
 
-  if (result.raw.priceNow === null) {
-    result.notes.push("Could not extract L&S current price");
-  }
-  if (result.raw.previousClose === null) {
-    result.notes.push("Could not extract L&S previous close");
-  }
-  if (result.values["1D"] === null) {
-    result.notes.push("Could not calculate L&S 1D");
-  }
+    const all = Array.from(document.querySelectorAll('body *'))
+      .map(el => normalizeSpaces(el.textContent || ''))
+      .filter(Boolean)
+      .filter(txt => txt.length < 120);
 
-  result.notes.push("L&S 1M/YTD not implemented yet in first pass");
+    const out = {};
 
-  return result;
+    for (const [period, labels] of Object.entries(periodLabels)) {
+      let value = null;
+
+      for (const label of labels) {
+        const i = all.findIndex(txt => txt.toLowerCase() === label.toLowerCase());
+        if (i >= 0) {
+          const next = all.slice(i + 1, i + 6);
+          for (const candidate of next) {
+            if (candidate.includes('%')) {
+              value = parsePct(candidate);
+              if (value !== null) break;
+            }
+          }
+        }
+        if (value !== null) break;
+      }
+
+      out[period] = value;
+    }
+
+    return out;
+  }, PERIOD_LABELS);
 }
 
-function findNearestBeforeDate(rows, targetDate) {
-  const eligible = rows.filter(r => new Date(r.date) <= targetDate);
-  if (!eligible.length) return null;
-  return eligible[eligible.length - 1];
-}
-
-async function fetchYahooData(ticker) {
-  const result = {
-    source: "Yahoo",
-    values: {
-      "1D": null,
-      "1M": null,
-      "YTD": null
-    },
-    raw: {
-      currentPrice: null,
-      previousClose: null,
-      price1MBase: null,
-      priceYtdBase: null,
-      latestHistoricalClose: null
-    },
-    notes: []
-  };
+async function scrapeJustEtfByIsin(browser, isin) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 2200 } });
 
   try {
-    const quote = await yahooFinance.quote(ticker);
+    const url = `https://www.justetf.com/en/etf-profile.html?isin=${isin}`;
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForTimeout(2500);
+    await acceptCookiesIfNeeded(page);
+    await page.waitForTimeout(1500);
 
-    result.raw.currentPrice = quote.regularMarketPrice ?? null;
-    result.raw.previousClose = quote.regularMarketPreviousClose ?? quote.previousClose ?? null;
-    result.values["1D"] = pct(calcPct(result.raw.currentPrice, result.raw.previousClose));
+    const domResult = await extractUsingDom(page);
+    const text = await grabWholeText(page);
+    const textResult = extractFromTextBlock(text);
 
-    const today = new Date();
-    const monthAgo = new Date(today);
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-
-    const yearStart = new Date(today.getFullYear(), 0, 1);
-
-    const history = await yahooFinance.historical(ticker, {
-      period1: new Date(today.getFullYear() - 1, 11, 1),
-      period2: today,
-      interval: "1d"
-    });
-
-    const clean = history
-      .filter(r => r.close !== null && r.close !== undefined)
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    if (!clean.length) {
-      result.notes.push("Yahoo historical series empty");
-      return result;
+    const merged = {};
+    for (const key of Object.keys(PERIOD_LABELS)) {
+      merged[key] = domResult[key] ?? textResult[key] ?? null;
     }
 
-    const latest = clean[clean.length - 1];
-    const monthBase = findNearestBeforeDate(clean, monthAgo);
-    const ytdBase = findNearestBeforeDate(clean, yearStart);
+    const hasEnoughData = Object.values(merged).filter(v => v !== null).length >= 4;
 
-    result.raw.latestHistoricalClose = latest.close ?? null;
-    result.raw.price1MBase = monthBase?.close ?? null;
-    result.raw.priceYtdBase = ytdBase?.close ?? null;
-
-    result.values["1M"] = pct(calcPct(result.raw.latestHistoricalClose, result.raw.price1MBase));
-    result.values["YTD"] = pct(calcPct(result.raw.latestHistoricalClose, result.raw.priceYtdBase));
-  } catch (err) {
-    result.notes.push(`Yahoo error: ${err.message}`);
+    return {
+      isin,
+      url,
+      source: 'justETF',
+      ok: hasEnoughData,
+      ...merged,
+    };
+  } catch (error) {
+    return {
+      isin,
+      source: 'justETF',
+      ok: false,
+      error: error.message,
+      '1D': null,
+      '5D': null,
+      '1M': null,
+      '3M': null,
+      YTD: null,
+      '1Y': null,
+      '3Y': null,
+    };
+  } finally {
+    await page.close();
   }
-
-  return result;
 }
 
 async function main() {
-  const outDir = path.join(process.cwd(), "output");
-  await ensureDir(outDir);
+  if (!ISINS.length) {
+    console.log('Add your ISINs first in the ISINS array.');
+    return;
+  }
 
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
-    viewport: { width: 1600, height: 1400 }
-  });
 
-  const justetf = await scrapeJustETF(page, config.justetfUrl);
-  const ls = await scrapeLS(page, config.lsUrl);
-  const yahoo = await fetchYahooData(config.yahooTicker);
+  try {
+    const results = [];
 
-  await browser.close();
+    for (const isin of ISINS) {
+      console.log(`Checking ${isin}...`);
+      const row = await scrapeJustEtfByIsin(browser, isin);
+      results.push(row);
+    }
 
-  const payload = {
-    generatedAt: new Date().toISOString(),
-    etf: {
-      name: config.name,
-      isin: config.isin,
-      yahooTicker: config.yahooTicker
-    },
-    results: [justetf, ls, yahoo]
-  };
+    console.table(
+      results.map(r => ({
+        isin: r.isin,
+        ok: r.ok,
+        '1D': r['1D'],
+        '5D': r['5D'],
+        '1M': r['1M'],
+        '3M': r['3M'],
+        YTD: r.YTD,
+        '1Y': r['1Y'],
+        '3Y': r['3Y'],
+      }))
+    );
 
-  await fs.writeFile(
-    path.join(outDir, "msci-world-results.json"),
-    JSON.stringify(payload, null, 2),
-    "utf8"
-  );
-
-  const rows = [
-    ["Source", "1D", "1M", "YTD", "Notes"],
-    ...payload.results.map(r => [
-      r.source,
-      r.values["1D"] ?? "",
-      r.values["1M"] ?? "",
-      r.values["YTD"] ?? "",
-      (r.notes || []).join(" | ")
-    ])
-  ];
-
-  const csv = rows
-    .map(row =>
-      row
-        .map(cell => `"${String(cell).replace(/"/g, '""')}"`)
-        .join(",")
-    )
-    .join("\n");
-
-  await fs.writeFile(
-    path.join(outDir, "msci-world-results.csv"),
-    csv,
-    "utf8"
-  );
-
-  console.log(JSON.stringify(payload, null, 2));
+    fs.writeFileSync('justetf-periods-output.json', JSON.stringify(results, null, 2));
+    console.log('\nSaved: justetf-periods-output.json');
+  } finally {
+    await browser.close();
+  }
 }
 
 main().catch(err => {
