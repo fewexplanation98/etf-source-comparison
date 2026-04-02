@@ -27,26 +27,23 @@ function toIsoDate(value) {
 }
 
 async function fetchHistory(ticker) {
-  const now = new Date();
-  const start = new Date();
-  start.setFullYear(now.getFullYear() - 3);
-  start.setDate(start.getDate() - 10);
-
-  const rows = await yahooFinance.historical(ticker, {
-    period1: start,
-    period2: now,
+  const result = await yahooFinance.chart(ticker, {
+    period1: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365 * 3 - 1000 * 60 * 60 * 24 * 10),
+    period2: new Date(),
     interval: "1d"
   });
 
-  return rows
-    .filter(r => r?.date && r?.close !== null && r?.close !== undefined)
-    .map(r => ({
-      date: toIsoDate(r.date),
-      close: Number(r.close),
-      open: r.open ?? null,
-      high: r.high ?? null,
-      low: r.low ?? null,
-      volume: r.volume ?? null
+  const quotes = result?.quotes ?? [];
+
+  return quotes
+    .filter(q => q?.date && q?.close !== null && q?.close !== undefined)
+    .map(q => ({
+      date: toIsoDate(q.date),
+      close: Number(q.close),
+      open: q.open ?? null,
+      high: q.high ?? null,
+      low: q.low ?? null,
+      volume: q.volume ?? null
     }))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
@@ -69,7 +66,7 @@ async function main() {
         ticker: etf.ticker,
         ok: history.length > 0,
         points: history,
-        notes: history.length ? [] : ["No historical data returned"]
+        notes: history.length ? [] : ["No chart data returned"]
       });
     } catch (error) {
       results.push({
