@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
+
+const yahooFinance = new YahooFinance();
 
 const ETFS = [
   { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
