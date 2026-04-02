@@ -1,7 +1,17 @@
 import fs from "fs/promises";
 import path from "path";
 import { chromium } from "playwright";
-import config from "../etf.config.json" with { type: "json" };
+
+const ETFS = [
+  { name: "MSCI World", isin: "IE00B4L5Y983" },
+  { name: "MSCI World Value", isin: "IE00BP3QZB59" },
+  { name: "Emerging Markets", isin: "IE00BKM4GZ66" },
+  { name: "Gold", isin: "IE00B4ND3602" },
+  { name: "Government Bond", isin: "IE00B14X4Q57" },
+  { name: "Euro Corporate Bond", isin: "IE00B3F81R35" },
+  { name: "Defence Tech", isin: "IE000JCW3DZ3" },
+  { name: "AI & Big Data", isin: "IE00BGV5VN51" }
+];
 
 function pct(num) {
   if (num === null || num === undefined || Number.isNaN(num)) return null;
@@ -37,9 +47,14 @@ async function safeClickCookieButtons(page) {
   return false;
 }
 
-async function scrapeJustETF(page, url) {
+async function scrapeJustETF(page, etf) {
+  const url = `https://www.justetf.com/en/etf-profile.html?isin=${etf.isin}`;
+
   const result = {
     source: "justETF",
+    name: etf.name,
+    isin: etf.isin,
+    url,
     values: {
       "1D": null,
       "1M": null,
@@ -63,11 +78,6 @@ async function scrapeJustETF(page, url) {
   } catch {
     result.notes.push("Could not scroll to Chart section");
   }
-
-  await page.screenshot({
-    path: "output/justetf-debug-before.png",
-    fullPage: true
-  });
 
   async function clickPeriod(period) {
     const candidates = [
@@ -126,11 +136,6 @@ async function scrapeJustETF(page, url) {
       continue;
     }
 
-    await page.screenshot({
-      path: `output/justetf-${item.period}.png`,
-      fullPage: true
-    });
-
     const value = await extractVisibleLabelValue(item.labels);
 
     if (value === null) {
@@ -152,17 +157,21 @@ async function main() {
     viewport: { width: 1600, height: 1400 }
   });
 
-  const justetf = await scrapeJustETF(page, config.justetfUrl);
+  const results = [];
 
-  await browser.close();
+  try {
+    for (const etf of ETFS) {
+      console.log(`Checking ${etf.name} - ${etf.isin}`);
+      const row = await scrapeJustETF(page, etf);
+      results.push(row);
+    }
+  } finally {
+    await browser.close();
+  }
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    etf: {
-      name: config.name,
-      isin: config.isin
-    },
-    results: [justetf]
+    results
   };
 
   await fs.writeFile(
@@ -172,8 +181,10 @@ async function main() {
   );
 
   const rows = [
-   ["Source", "1D", "1M", "3M", "YTD", "1Y", "3Y", "Notes"],
-    ...payload.results.map(r => [
+    ["Name", "ISIN", "Source", "1D", "1M", "3M", "YTD", "1Y", "3Y", "Notes"],
+    ...results.map(r => [
+      r.name,
+      r.isin,
       r.source,
       r.values["1D"] ?? "",
       r.values["1M"] ?? "",
