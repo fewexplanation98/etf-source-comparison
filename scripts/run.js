@@ -7,8 +7,14 @@ const { chromium } = require('playwright');
 
 // Put your ISINs here
 const ISINS = [
-  // 'IE00B4L5Y983',
-  // 'IE00BK5BQT80',
+  'IE00B4L5Y983', // MSCI World
+  'IE00BP3QZB59', // MSCI World Value
+  'IE00BKM4GZ66', // Emerging Markets
+  'IE00B4ND3602', // Gold
+  'IE00B14X4Q57', // Government Bond
+  'IE00B3F81R35', // Euro Corporate Bond
+  'IE000JCW3DZ3', // Defence Tech
+  'IE00BGV5VN51', // AI & Big Data
 ];
 
 const PERIOD_LABELS = {
