@@ -172,11 +172,10 @@ async function main() {
   );
 
   const rows = [
-    ["Source", "1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "Notes"],
+   ["Source", "1D", "1M", "3M", "YTD", "1Y", "3Y", "Notes"],
     ...payload.results.map(r => [
       r.source,
       r.values["1D"] ?? "",
-      r.values["5D"] ?? "",
       r.values["1M"] ?? "",
       r.values["3M"] ?? "",
       r.values["YTD"] ?? "",
