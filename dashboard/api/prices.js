@@ -9,6 +9,8 @@ const ETFS = [
   { name: "AI & Big Data", isin: "IE00BGV5VN51", ticker: "XAIX.DE" }
 ];
 
+export const maxDuration = 60;
+
 function toUnixSeconds(date) {
   return Math.floor(date.getTime() / 1000);
 }
@@ -54,7 +56,6 @@ async function fetchYahoo(url, label) {
   }
 
   const data = await res.json();
-
   const result = data?.chart?.result?.[0];
   const error = data?.chart?.error;
 
@@ -113,21 +114,34 @@ async function fetchETF(etf) {
   };
 }
 
-export default async function handler(req, res) {
-  try {
-    const results = await Promise.all(ETFS.map(fetchETF));
+export default {
+  async fetch(request) {
+    try {
+      const results = await Promise.all(ETFS.map(fetchETF));
 
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+      return new Response(
+        JSON.stringify({
+          generatedAt: new Date().toISOString(),
+          results
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "s-maxage=300, stale-while-revalidate=600"
+          }
+        }
+      );
+    } catch (error) {
+      console.error("PRICES_API_ERROR", error);
 
-    return res.status(200).json({
-      generatedAt: new Date().toISOString(),
-      results
-    });
-  } catch (error) {
-    console.error("PRICES_API_ERROR", error);
-
-    return res.status(500).json({
-      error: error.message || "Unexpected error"
-    });
+      return new Response(
+        JSON.stringify({ error: error.message || "Unexpected error" }),
+        {
+          status: 500,
+          headers: { "content-type": "application/json" }
+        }
+      );
+    }
   }
-}
+};
