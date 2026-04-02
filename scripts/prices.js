@@ -27,45 +27,9 @@ function toIsoDateFromUnix(seconds) {
   return d.toISOString();
 }
 
-async function fetchYahooChart(ticker) {
-  const now = new Date();
-  const start = new Date();
-  start.setFullYear(now.getFullYear() - 3);
-  start.setDate(start.getDate() - 10);
-
-  const period1 = toUnixSeconds(start);
-  const period2 = toUnixSeconds(now);
-
-  const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
-    `?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false&events=div%2Csplits`;
-
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-      "Accept": "application/json"
-    }
-  });
-
-  if (!res.ok) {
-    throw new Error(`Yahoo chart HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-
-  const result = data?.chart?.result?.[0];
-  const error = data?.chart?.error;
-
-  if (error) {
-    throw new Error(error.description || "Yahoo chart error");
-  }
-
-  if (!result) {
-    throw new Error("No Yahoo chart result");
-  }
-
-  const timestamps = result.timestamp || [];
-  const quote = result.indicators?.quote?.[0] || {};
+function mapYahooChartResult(result) {
+  const timestamps = result?.timestamp || [];
+  const quote = result?.indicators?.quote?.[0] || {};
 
   const opens = quote.open || [];
   const highs = quote.high || [];
@@ -92,6 +56,59 @@ async function fetchYahooChart(ticker) {
   return points;
 }
 
+async function fetchYahooJson(url, errorPrefix) {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "application/json"
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`${errorPrefix} HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const result = data?.chart?.result?.[0];
+  const error = data?.chart?.error;
+
+  if (error) {
+    throw new Error(error.description || `${errorPrefix} error`);
+  }
+
+  if (!result) {
+    throw new Error(`No ${errorPrefix} result`);
+  }
+
+  return result;
+}
+
+async function fetchYahooChart(ticker) {
+  const now = new Date();
+  const start = new Date();
+  start.setFullYear(now.getFullYear() - 3);
+  start.setDate(start.getDate() - 10);
+
+  const period1 = toUnixSeconds(start);
+  const period2 = toUnixSeconds(now);
+
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
+    `?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false&events=div%2Csplits`;
+
+  const result = await fetchYahooJson(url, "Yahoo chart");
+  return mapYahooChartResult(result);
+}
+
+async function fetchYahooIntraday(ticker) {
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
+    `?range=1d&interval=5m&includePrePost=false&events=div%2Csplits`;
+
+  const result = await fetchYahooJson(url, "Yahoo intraday");
+  return mapYahooChartResult(result);
+}
+
 async function main() {
   const outDir = path.join(process.cwd(), "output");
   await ensureDir(outDir);
@@ -101,27 +118,35 @@ async function main() {
   for (const etf of ETFS) {
     console.log(`Fetching history for ${etf.name} - ${etf.ticker}`);
 
-    try {
-      const history = await fetchYahooChart(etf.ticker);
+    let history = [];
+    let intraday = [];
+    const notes = [];
 
-      results.push({
-        name: etf.name,
-        isin: etf.isin,
-        ticker: etf.ticker,
-        ok: history.length > 0,
-        points: history,
-        notes: history.length ? [] : ["No chart data returned"]
-      });
+    try {
+      history = await fetchYahooChart(etf.ticker);
+      console.log(`Daily points: ${etf.name} - ${history.length}`);
     } catch (error) {
-      results.push({
-        name: etf.name,
-        isin: etf.isin,
-        ticker: etf.ticker,
-        ok: false,
-        points: [],
-        notes: [error.message]
-      });
+      notes.push(`Daily: ${error.message}`);
+      console.log(`ERROR DAILY ${etf.name} - ${etf.ticker} - ${error.message}`);
     }
+
+    try {
+      intraday = await fetchYahooIntraday(etf.ticker);
+      console.log(`Intraday points: ${etf.name} - ${intraday.length}`);
+    } catch (error) {
+      notes.push(`Intraday: ${error.message}`);
+      console.log(`ERROR INTRADAY ${etf.name} - ${etf.ticker} - ${error.message}`);
+    }
+
+    results.push({
+      name: etf.name,
+      isin: etf.isin,
+      ticker: etf.ticker,
+      ok: history.length > 0 || intraday.length > 0,
+      points: history,
+      intraday,
+      notes: notes.length ? notes : []
+    });
   }
 
   const payload = {
