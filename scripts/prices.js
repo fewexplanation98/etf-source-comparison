@@ -1,8 +1,5 @@
 import fs from "fs/promises";
 import path from "path";
-import YahooFinance from "yahoo-finance2";
-
-const yahooFinance = new YahooFinance();
 
 const ETFS = [
   { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
@@ -19,33 +16,80 @@ async function ensureDir(dir) {
   await fs.mkdir(dir, { recursive: true });
 }
 
-function toIsoDate(value) {
-  if (!value) return null;
-  const d = new Date(value);
+function toUnixSeconds(date) {
+  return Math.floor(date.getTime() / 1000);
+}
+
+function toIsoDateFromUnix(seconds) {
+  if (seconds === null || seconds === undefined) return null;
+  const d = new Date(seconds * 1000);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
 
-async function fetchHistory(ticker) {
-  const result = await yahooFinance.chart(ticker, {
-    period1: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365 * 3 - 1000 * 60 * 60 * 24 * 10),
-    period2: new Date(),
-    interval: "1d"
+async function fetchYahooChart(ticker) {
+  const now = new Date();
+  const start = new Date();
+  start.setFullYear(now.getFullYear() - 3);
+  start.setDate(start.getDate() - 10);
+
+  const period1 = toUnixSeconds(start);
+  const period2 = toUnixSeconds(now);
+
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
+    `?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false&events=div%2Csplits`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "application/json"
+    }
   });
 
-  const quotes = result?.quotes ?? [];
+  if (!res.ok) {
+    throw new Error(`Yahoo chart HTTP ${res.status}`);
+  }
 
-  return quotes
-    .filter(q => q?.date && q?.close !== null && q?.close !== undefined)
-    .map(q => ({
-      date: toIsoDate(q.date),
-      close: Number(q.close),
-      open: q.open ?? null,
-      high: q.high ?? null,
-      low: q.low ?? null,
-      volume: q.volume ?? null
-    }))
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  const data = await res.json();
+
+  const result = data?.chart?.result?.[0];
+  const error = data?.chart?.error;
+
+  if (error) {
+    throw new Error(error.description || "Yahoo chart error");
+  }
+
+  if (!result) {
+    throw new Error("No Yahoo chart result");
+  }
+
+  const timestamps = result.timestamp || [];
+  const quote = result.indicators?.quote?.[0] || {};
+
+  const opens = quote.open || [];
+  const highs = quote.high || [];
+  const lows = quote.low || [];
+  const closes = quote.close || [];
+  const volumes = quote.volume || [];
+
+  const points = [];
+
+  for (let i = 0; i < timestamps.length; i++) {
+    const close = closes[i];
+    if (close === null || close === undefined) continue;
+
+    points.push({
+      date: toIsoDateFromUnix(timestamps[i]),
+      close: Number(close),
+      open: opens[i] ?? null,
+      high: highs[i] ?? null,
+      low: lows[i] ?? null,
+      volume: volumes[i] ?? null
+    });
+  }
+
+  return points;
 }
 
 async function main() {
@@ -58,7 +102,7 @@ async function main() {
     console.log(`Fetching history for ${etf.name} - ${etf.ticker}`);
 
     try {
-      const history = await fetchHistory(etf.ticker);
+      const history = await fetchYahooChart(etf.ticker);
 
       results.push({
         name: etf.name,
