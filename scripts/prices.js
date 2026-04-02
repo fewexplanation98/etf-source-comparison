@@ -5,7 +5,7 @@ const ETFS = [
   { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
   { name: "MSCI World Value", isin: "IE00BP3QZB59", ticker: "XDEV.DE" },
   { name: "Emerging Markets", isin: "IE00BKM4GZ66", ticker: "XMME.DE" },
-  { name: "Gold", isin: "IE00B4ND3602", ticker: "SGLN.MI" },
+  { name: "Gold", isin: "IE00B4ND3602", ticker: "EGLN.L" },
   { name: "Government Bond", isin: "IE00B14X4Q57", ticker: "IBGL.AS" },
   { name: "Euro Corporate Bond", isin: "IE00B3F81R35", ticker: "IEAA.L" },
   { name: "Defence Tech", isin: "IE000JCW3DZ3", ticker: "4MMR.DE" },
