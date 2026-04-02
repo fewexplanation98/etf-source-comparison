@@ -153,13 +153,14 @@ function getCurrentPrice(priceRow) {
 
 function getTrendValue(perfRow, period) {
   if (!perfRow?.values) return null;
-  if (SUMMARY_PERIODS.includes(period)) {
-    return perfRow.values[period] ?? null;
+
+  if (period === "ALL") {
+    const priceRow = getPriceRow(perfRow.isin);
+    const points = getDisplayPoints(priceRow, period);
+    return calculatePointChange(points);
   }
 
-  const priceRow = getPriceRow(perfRow.isin);
-  const points = getDisplayPoints(priceRow, period);
-  return calculatePointChange(points);
+  return perfRow.values[period] ?? null;
 }
 
 function getDisplayPoints(priceRow, period) {
