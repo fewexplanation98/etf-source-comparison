@@ -13,43 +13,35 @@ function toUnixSeconds(date) {
   return Math.floor(date.getTime() / 1000);
 }
 
-function toIsoDateFromUnix(seconds) {
-  if (seconds === null || seconds === undefined) return null;
+function toIso(seconds) {
+  if (seconds == null) return null;
   const d = new Date(seconds * 1000);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-function mapYahooChartResult(result) {
+function mapResult(result) {
   const timestamps = result?.timestamp || [];
-  const quote = result?.indicators?.quote?.[0] || {};
-
-  const opens = quote.open || [];
-  const highs = quote.high || [];
-  const lows = quote.low || [];
-  const closes = quote.close || [];
-  const volumes = quote.volume || [];
+  const q = result?.indicators?.quote?.[0] || {};
 
   const points = [];
 
   for (let i = 0; i < timestamps.length; i++) {
-    const close = closes[i];
-    if (close === null || close === undefined) continue;
+    if (q.close?.[i] == null) continue;
 
     points.push({
-      date: toIsoDateFromUnix(timestamps[i]),
-      close: Number(close),
-      open: opens[i] ?? null,
-      high: highs[i] ?? null,
-      low: lows[i] ?? null,
-      volume: volumes[i] ?? null
+      date: toIso(timestamps[i]),
+      close: Number(q.close[i]),
+      open: q.open?.[i] ?? null,
+      high: q.high?.[i] ?? null,
+      low: q.low?.[i] ?? null,
+      volume: q.volume?.[i] ?? null
     });
   }
 
   return points;
 }
 
-async function fetchYahooJson(url, errorPrefix) {
+async function fetchYahoo(url, label) {
   const res = await fetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0",
@@ -58,81 +50,72 @@ async function fetchYahooJson(url, errorPrefix) {
   });
 
   if (!res.ok) {
-    throw new Error(`${errorPrefix} HTTP ${res.status}`);
+    throw new Error(`${label} HTTP ${res.status}`);
   }
 
   const data = await res.json();
+
   const result = data?.chart?.result?.[0];
   const error = data?.chart?.error;
 
   if (error) {
-    throw new Error(error.description || `${errorPrefix} error`);
+    throw new Error(error.description || `${label} error`);
   }
 
   if (!result) {
-    throw new Error(`No ${errorPrefix} result`);
+    throw new Error(`No ${label} result`);
   }
 
   return result;
 }
 
-async function fetchYahooChart(ticker) {
+async function fetchDaily(ticker) {
   const now = new Date();
   const start = new Date();
   start.setFullYear(now.getFullYear() - 3);
-  start.setDate(start.getDate() - 10);
-
-  const period1 = toUnixSeconds(start);
-  const period2 = toUnixSeconds(now);
 
   const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
-    `?period1=${period1}&period2=${period2}&interval=1d&includePrePost=false&events=div%2Csplits`;
+    `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}` +
+    `?period1=${toUnixSeconds(start)}&period2=${toUnixSeconds(now)}&interval=1d`;
 
-  const result = await fetchYahooJson(url, "Yahoo chart");
-  return mapYahooChartResult(result);
+  const result = await fetchYahoo(url, "daily");
+  return mapResult(result);
 }
 
-async function fetchYahooIntraday(ticker) {
+async function fetchIntraday(ticker) {
   const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
-    `?range=1d&interval=5m&includePrePost=false&events=div%2Csplits`;
+    `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}` +
+    `?range=1d&interval=5m`;
 
-  const result = await fetchYahooJson(url, "Yahoo intraday");
-  return mapYahooChartResult(result);
+  const result = await fetchYahoo(url, "intraday");
+  return mapResult(result);
+}
+
+async function fetchETF(etf) {
+  const [dailyRes, intraRes] = await Promise.allSettled([
+    fetchDaily(etf.ticker),
+    fetchIntraday(etf.ticker)
+  ]);
+
+  return {
+    name: etf.name,
+    isin: etf.isin,
+    ticker: etf.ticker,
+    ok:
+      (dailyRes.status === "fulfilled" && dailyRes.value.length) ||
+      (intraRes.status === "fulfilled" && intraRes.value.length),
+    points: dailyRes.status === "fulfilled" ? dailyRes.value : [],
+    intraday: intraRes.status === "fulfilled" ? intraRes.value : [],
+    notes: [
+      ...(dailyRes.status === "rejected" ? [`Daily: ${dailyRes.reason.message}`] : []),
+      ...(intraRes.status === "rejected" ? [`Intraday: ${intraRes.reason.message}`] : [])
+    ]
+  };
 }
 
 export default async function handler(req, res) {
   try {
-    const results = [];
-
-    for (const etf of ETFS) {
-      let points = [];
-      let intraday = [];
-      const notes = [];
-
-      try {
-        points = await fetchYahooChart(etf.ticker);
-      } catch (error) {
-        notes.push(`Daily: ${error.message}`);
-      }
-
-      try {
-        intraday = await fetchYahooIntraday(etf.ticker);
-      } catch (error) {
-        notes.push(`Intraday: ${error.message}`);
-      }
-
-      results.push({
-        name: etf.name,
-        isin: etf.isin,
-        ticker: etf.ticker,
-        ok: points.length > 0 || intraday.length > 0,
-        points,
-        intraday,
-        notes
-      });
-    }
+    const results = await Promise.all(ETFS.map(fetchETF));
 
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
 
@@ -141,6 +124,8 @@ export default async function handler(req, res) {
       results
     });
   } catch (error) {
+    console.error("PRICES_API_ERROR", error);
+
     return res.status(500).json({
       error: error.message || "Unexpected error"
     });
