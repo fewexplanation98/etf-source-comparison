@@ -2,14 +2,14 @@ import fs from "fs/promises";
 import path from "path";
 
 const ETFS = [
-  { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
-  { name: "MSCI World Value", isin: "IE00BP3QZB59", ticker: "IWVL.DE" },
-  { name: "Emerging Markets", isin: "IE00BKM4GZ66", ticker: "EIMI.DE" },
-  { name: "Gold", isin: "IE00B4ND3602", ticker: "SGLN.DE" },
+ { name: "MSCI World", isin: "IE00B4L5Y983", ticker: "EUNL.DE" },
+  { name: "MSCI World Value", isin: "IE00BP3QZB59", ticker: "IWVL.L" },
+  { name: "Emerging Markets", isin: "IE00BKM4GZ66", ticker: "EIMI.MI" },
+  { name: "Gold", isin: "IE00B4ND3602", ticker: "IE00B4ND3602.IR" },
   { name: "Government Bond", isin: "IE00B14X4Q57", ticker: "IBGL.AS" },
-  { name: "Euro Corporate Bond", isin: "IE00B3F81R35", ticker: "IEAC.AS" },
-  { name: "Defence Tech", isin: "IE000JCW3DZ3", ticker: "DFEN.MI" },
-  { name: "AI & Big Data", isin: "IE00BGV5VN51", ticker: "XAIX.MI" }
+  { name: "Euro Corporate Bond", isin: "IE00B3F81R35", ticker: "IEAC.L" },
+  { name: "Defence Tech", isin: "IE000JCW3DZ3", ticker: "4MMR.DE" },
+  { name: "AI & Big Data", isin: "IE00BGV5VN51", ticker: "XAIX.DE" }
 ];
 
 async function ensureDir(dir) {
