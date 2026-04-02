@@ -42,7 +42,6 @@ async function scrapeJustETF(page, url) {
     source: "justETF",
     values: {
       "1D": null,
-      "5D": null,
       "1M": null,
       "3M": null,
       "YTD": null,
@@ -112,7 +111,6 @@ async function scrapeJustETF(page, url) {
 
   const mapping = [
     { period: "1D", labels: ["1 day", "1D"] },
-    { period: "5D", labels: ["5 days", "5D"] },
     { period: "1M", labels: ["1 month", "1M"] },
     { period: "3M", labels: ["3 months", "3M"] },
     { period: "YTD", labels: ["YTD", "year to date"] },
