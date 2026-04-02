@@ -152,15 +152,21 @@ function getCurrentPrice(priceRow) {
 }
 
 function getTrendValue(perfRow, period) {
-  if (!perfRow?.values) return null;
+  if (!perfRow) return null;
+
+  const priceRow = getPriceRow(perfRow.isin);
+
+  if (period === "1D") {
+    const intradayPoints = priceRow?.intraday || [];
+    return calculatePointChange(intradayPoints);
+  }
 
   if (period === "ALL") {
-    const priceRow = getPriceRow(perfRow.isin);
     const points = getDisplayPoints(priceRow, period);
     return calculatePointChange(points);
   }
 
-  return perfRow.values[period] ?? null;
+  return perfRow.values?.[period] ?? null;
 }
 
 function getDisplayPoints(priceRow, period) {
