@@ -851,8 +851,8 @@ function renderAll() {
 
 async function loadData() {
   const [justetfRes, pricesRes] = await Promise.all([
-    fetch("./data/justetf-results.json"),
-    fetch("./data/price-history.json")
+    fetch("/api/performance"),
+    fetch("/api/prices")
   ]);
 
   if (!justetfRes.ok) {
