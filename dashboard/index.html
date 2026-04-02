@@ -8,26 +8,25 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
-        <div>
+      <header class="hero">
+        <div class="hero-copy">
           <p class="eyebrow">Portfolio Dashboard</p>
-          <h1>ETF Performance Tracker</h1>
+          <h1>ETF Market Dashboard</h1>
+          <p class="hero-subtitle">
+            Fast view on leaders, laggards, price action and portfolio trends.
+          </p>
         </div>
-        <div class="topbar-right">
-          <span id="lastUpdated" class="last-updated">Loading data...</span>
+
+        <div class="hero-meta card">
+          <span class="meta-label">Data last refreshed</span>
+          <span id="lastUpdated" class="meta-value">Loading...</span>
         </div>
       </header>
 
-      <main class="content">
-        <section class="controls card">
-          <div class="control-group">
-            <label for="etfSelect">ETF</label>
-            <select id="etfSelect"></select>
-          </div>
-
-          <div class="control-group">
-            <label>Chart period</label>
-            <div class="period-buttons" id="periodButtons">
+      <section class="top-controls card">
+        <div class="top-controls-left">
+          <span class="section-kicker">Global period</span>
+          <div class="period-buttons" id="periodButtons">
             <button data-period="1D" class="period-btn active">1D</button>
             <button data-period="1M" class="period-btn">1M</button>
             <button data-period="3M" class="period-btn">3M</button>
@@ -35,73 +34,259 @@
             <button data-period="1Y" class="period-btn">1Y</button>
             <button data-period="3Y" class="period-btn">3Y</button>
             <button data-period="ALL" class="period-btn">ALL</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Market Highlights</p>
+            <h2>Quick signals</h2>
+          </div>
+        </div>
+
+        <div class="highlights-grid">
+          <article class="highlight-card card" id="bestCard">
+            <div class="highlight-top">
+              <span class="highlight-tag positive">Best ETF</span>
             </div>
-          </div>
-        </section>
+            <h3 id="bestTitle">-</h3>
+            <p id="bestSubtitle" class="highlight-subtitle">-</p>
+            <div id="bestValue" class="highlight-value">-</div>
+            <p id="bestNote" class="highlight-note">-</p>
+          </article>
 
-        <section class="summary-grid" id="summaryCards">
-          <div class="metric-card card">
-            <span class="metric-label">1D</span>
-            <span class="metric-value">-</span>
-          </div>
-          <div class="metric-card card">
-            <span class="metric-label">1M</span>
-            <span class="metric-value">-</span>
-          </div>
-          <div class="metric-card card">
-            <span class="metric-label">3M</span>
-            <span class="metric-value">-</span>
-          </div>
-          <div class="metric-card card">
-            <span class="metric-label">YTD</span>
-            <span class="metric-value">-</span>
-          </div>
-          <div class="metric-card card">
-            <span class="metric-label">1Y</span>
-            <span class="metric-value">-</span>
-          </div>
-          <div class="metric-card card">
-            <span class="metric-label">3Y</span>
-            <span class="metric-value">-</span>
-          </div>
-        </section>
+          <article class="highlight-card card" id="weakestCard">
+            <div class="highlight-top">
+              <span class="highlight-tag negative">Weakest ETF</span>
+            </div>
+            <h3 id="weakestTitle">-</h3>
+            <p id="weakestSubtitle" class="highlight-subtitle">-</p>
+            <div id="weakestValue" class="highlight-value">-</div>
+            <p id="weakestNote" class="highlight-note">-</p>
+          </article>
 
-        <section class="chart-card card">
-          <div class="chart-header">
+          <article class="highlight-card card" id="opportunityCard">
+            <div class="highlight-top">
+              <span class="highlight-tag neutral">Opportunity</span>
+            </div>
+            <h3 id="opportunityTitle">-</h3>
+            <p id="opportunitySubtitle" class="highlight-subtitle">-</p>
+            <div id="opportunityValue" class="highlight-value">-</div>
+            <p id="opportunityNote" class="highlight-note">-</p>
+          </article>
+
+          <article class="highlight-card card" id="alertCard">
+            <div class="highlight-top">
+              <span class="highlight-tag warning">Alert</span>
+            </div>
+            <h3 id="alertTitle">-</h3>
+            <p id="alertSubtitle" class="highlight-subtitle">-</p>
+            <div id="alertValue" class="highlight-value">-</div>
+            <p id="alertNote" class="highlight-note">-</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">ETF Snapshot</p>
+            <h2>Portfolio view by ETF</h2>
+          </div>
+        </div>
+
+        <div id="snapshotGrid" class="snapshot-grid"></div>
+      </section>
+
+      <section class="section-block comparison-section">
+        <div class="comparison-main card">
+          <div class="section-header compact">
             <div>
-              <h2 id="chartTitle">Price chart</h2>
-              <p id="chartSubtitle">Loading...</p>
+              <p class="section-kicker">ETF Comparison</p>
+              <h2>Relative performance</h2>
+            </div>
+            <p id="comparisonSubtitle" class="section-note">Loading...</p>
+          </div>
+
+          <div class="chart-wrap large">
+            <svg id="comparisonChart" viewBox="0 0 1000 420" preserveAspectRatio="none"></svg>
+          </div>
+
+          <div id="comparisonLegend" class="comparison-legend"></div>
+        </div>
+
+        <aside class="ranking-panel card">
+          <div class="section-header compact">
+            <div>
+              <p class="section-kicker">Period Ranking</p>
+              <h2>Who is leading</h2>
             </div>
           </div>
 
-          <div class="chart-wrap">
-            <svg id="priceChart" viewBox="0 0 1000 360" preserveAspectRatio="none"></svg>
-          </div>
-        </section>
+          <div id="rankingBars" class="ranking-bars"></div>
+        </aside>
+      </section>
 
-        <section class="table-card card">
-          <div class="table-header">
-            <h2>All ETFs overview</h2>
+      <section class="section-block">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">ETF Deep Dive</p>
+            <h2>Single ETF focus</h2>
+          </div>
+        </div>
+
+        <div class="deep-dive-layout">
+          <div class="deep-dive-main card">
+            <div class="deep-dive-controls">
+              <div class="control-group">
+                <label for="etfSelect">ETF</label>
+                <select id="etfSelect"></select>
+              </div>
+            </div>
+
+            <div class="deep-dive-headline">
+              <div>
+                <h3 id="chartTitle">Price chart</h3>
+                <p id="chartSubtitle" class="section-note">Loading...</p>
+              </div>
+              <div class="deep-dive-pricebox">
+                <span class="pricebox-label">Current price</span>
+                <span id="deepDiveCurrentPrice" class="pricebox-value">-</span>
+              </div>
+            </div>
+
+            <div class="chart-wrap xlarge">
+              <svg id="priceChart" viewBox="0 0 1000 420" preserveAspectRatio="none"></svg>
+            </div>
           </div>
 
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>1D</th>
-                  <th>1M</th>
-                  <th>3M</th>
-                  <th>YTD</th>
-                  <th>1Y</th>
-                  <th>3Y</th>
-                </tr>
-              </thead>
-              <tbody id="overviewTableBody"></tbody>
-            </table>
+          <div class="deep-dive-side">
+            <div class="detail-card card">
+              <p class="section-kicker">ETF Profile</p>
+              <div class="profile-list">
+                <div class="profile-row">
+                  <span class="profile-label">Short name</span>
+                  <span id="profileShortName" class="profile-value">-</span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">Official name</span>
+                  <span id="profileOfficialName" class="profile-value">-</span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">ISIN</span>
+                  <span id="profileIsin" class="profile-value">-</span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">Ticker</span>
+                  <span id="profileTicker" class="profile-value">-</span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">Selected period trend</span>
+                  <span id="profilePeriodTrend" class="profile-value">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-card card">
+              <p class="section-kicker">Top signals</p>
+              <div class="signals-list">
+                <div class="signal-item">
+                  <span class="signal-label">1D</span>
+                  <span id="signal1D" class="signal-value">-</span>
+                </div>
+                <div class="signal-item">
+                  <span class="signal-label">1M</span>
+                  <span id="signal1M" class="signal-value">-</span>
+                </div>
+                <div class="signal-item">
+                  <span class="signal-label">3M</span>
+                  <span id="signal3M" class="signal-value">-</span>
+                </div>
+                <div class="signal-item">
+                  <span class="signal-label">YTD</span>
+                  <span id="signalYTD" class="signal-value">-</span>
+                </div>
+                <div class="signal-item">
+                  <span class="signal-label">1Y</span>
+                  <span id="signal1Y" class="signal-value">-</span>
+                </div>
+                <div class="signal-item">
+                  <span class="signal-label">3Y</span>
+                  <span id="signal3Y" class="signal-value">-</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-card card">
+              <p class="section-kicker">Heatmap</p>
+              <h3 class="mini-title">Key holdings noise</h3>
+              <div id="holdingsHeatmap" class="heatmap-grid">
+                <div class="heatmap-box heat-high">NVIDIA</div>
+                <div class="heatmap-box heat-mid">Microsoft</div>
+                <div class="heatmap-box heat-low">ASML</div>
+                <div class="heatmap-box heat-mid">Amazon</div>
+                <div class="heatmap-box heat-low">Alphabet</div>
+                <div class="heatmap-box heat-high">Meta</div>
+              </div>
+            </div>
+
+            <div class="detail-card card">
+              <p class="section-kicker">Company News</p>
+              <div class="news-list">
+                <article class="news-item">
+                  <span class="news-badge neg">Negative</span>
+                  <p class="news-title">NVIDIA under pressure after weak market sentiment</p>
+                </article>
+                <article class="news-item">
+                  <span class="news-badge pos">Positive</span>
+                  <p class="news-title">Defence names supported by persistent geopolitical focus</p>
+                </article>
+                <article class="news-item">
+                  <span class="news-badge neutral">Neutral</span>
+                  <p class="news-title">Macro rate expectations continue to influence bond ETFs</p>
+                </article>
+              </div>
+            </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">Market Pulse</p>
+            <h2>Macro and thematic watchlist</h2>
+          </div>
+        </div>
+
+        <div class="macro-grid">
+          <article class="macro-card card">
+            <span class="macro-tag">Macro</span>
+            <h3>Rates and bonds</h3>
+            <p>
+              Track whether falling yields are helping bond ETFs stabilize after weak short-term momentum.
+            </p>
+          </article>
+
+          <article class="macro-card card">
+            <span class="macro-tag">Equities</span>
+            <h3>Growth reset or continuation</h3>
+            <p>
+              Watch if AI and tech weakness is just a short pullback or the start of a broader growth rotation.
+            </p>
+          </article>
+
+          <article class="macro-card card">
+            <span class="macro-tag">Thematic</span>
+            <h3>Defence momentum</h3>
+            <p>
+              Defence-related ETFs can stay strong when geopolitical newsflow remains intense and recurring.
+            </p>
+          </article>
+        </div>
+      </section>
     </div>
 
     <script src="./app.js"></script>
