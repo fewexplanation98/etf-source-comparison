@@ -1,9 +1,12 @@
 {
   "name": "etf-source-comparison",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "scripts": {
-    "start": "node compare-justetf.js"
+    "start": "node scripts/run.js"
+  },
+  "dependencies": {
+    "playwright": "^1.54.1",
+    "yahoo-finance2": "^2.13.3"
   }
 }
