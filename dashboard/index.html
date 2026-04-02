@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ETF Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Portfolio Dashboard</p>
+          <h1>ETF Performance Tracker</h1>
+        </div>
+        <div class="topbar-right">
+          <span id="lastUpdated" class="last-updated">Loading data...</span>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="controls card">
+          <div class="control-group">
+            <label for="etfSelect">ETF</label>
+            <select id="etfSelect"></select>
+          </div>
+
+          <div class="control-group">
+            <label>Chart period</label>
+            <div class="period-buttons" id="periodButtons">
+              <button data-period="1M" class="period-btn active">1M</button>
+              <button data-period="3M" class="period-btn">3M</button>
+              <button data-period="YTD" class="period-btn">YTD</button>
+              <button data-period="1Y" class="period-btn">1Y</button>
+              <button data-period="3Y" class="period-btn">3Y</button>
+              <button data-period="ALL" class="period-btn">ALL</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="summary-grid" id="summaryCards">
+          <div class="metric-card card">
+            <span class="metric-label">1D</span>
+            <span class="metric-value">-</span>
+          </div>
+          <div class="metric-card card">
+            <span class="metric-label">1M</span>
+            <span class="metric-value">-</span>
+          </div>
+          <div class="metric-card card">
+            <span class="metric-label">3M</span>
+            <span class="metric-value">-</span>
+          </div>
+          <div class="metric-card card">
+            <span class="metric-label">YTD</span>
+            <span class="metric-value">-</span>
+          </div>
+          <div class="metric-card card">
+            <span class="metric-label">1Y</span>
+            <span class="metric-value">-</span>
+          </div>
+          <div class="metric-card card">
+            <span class="metric-label">3Y</span>
+            <span class="metric-value">-</span>
+          </div>
+        </section>
+
+        <section class="chart-card card">
+          <div class="chart-header">
+            <div>
+              <h2 id="chartTitle">Price chart</h2>
+              <p id="chartSubtitle">Loading...</p>
+            </div>
+          </div>
+
+          <div class="chart-wrap">
+            <svg id="priceChart" viewBox="0 0 1000 360" preserveAspectRatio="none"></svg>
+          </div>
+        </section>
+
+        <section class="table-card card">
+          <div class="table-header">
+            <h2>All ETFs overview</h2>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>1D</th>
+                  <th>1M</th>
+                  <th>3M</th>
+                  <th>YTD</th>
+                  <th>1Y</th>
+                  <th>3Y</th>
+                </tr>
+              </thead>
+              <tbody id="overviewTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
