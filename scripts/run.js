@@ -1,244 +1,208 @@
-// justetf-periods-test.js
-// Step 1: test JustETF performance extraction for all your ETFs by ISIN
-// Output: console table + JSON file with 1D / 5D / 1M / 3M / YTD / 1Y / 3Y
+import fs from "fs/promises";
+import path from "path";
+import { chromium } from "playwright";
+import config from "../etf.config.json" with { type: "json" };
 
-const fs = require('fs');
-const { chromium } = require('playwright');
-
-// Put your ISINs here
-const ISINS = [
-  'IE00B4L5Y983', // MSCI World
-  'IE00BP3QZB59', // MSCI World Value
-  'IE00BKM4GZ66', // Emerging Markets
-  'IE00B4ND3602', // Gold
-  'IE00B14X4Q57', // Government Bond
-  'IE00B3F81R35', // Euro Corporate Bond
-  'IE000JCW3DZ3', // Defence Tech
-  'IE00BGV5VN51', // AI & Big Data
-];
-
-const PERIOD_LABELS = {
-  '1D': ['1 day', '1D', '1 day %', '1 giorno'],
-  '5D': ['5 days', '5D', '5 days %', '5 giorni'],
-  '1M': ['1 month', '1M', '1 month %', '1 mese'],
-  '3M': ['3 months', '3M', '3 months %', '3 mesi'],
-  'YTD': ['YTD', 'year to date'],
-  '1Y': ['1 year', '1Y', '1 anno'],
-  '3Y': ['3 years', '3Y', '3 anni'],
-};
-
-function normalizeSpaces(str) {
-  return str.replace(/\s+/g, ' ').trim();
+function pct(num) {
+  if (num === null || num === undefined || Number.isNaN(num)) return null;
+  return Number(num.toFixed(2));
 }
 
-function parsePct(text) {
-  if (!text) return null;
-  const cleaned = text
-    .replace(/\u2212/g, '-')
-    .replace(/,/g, '.')
-    .replace(/[^0-9+\-\.]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const matches = cleaned.match(/[+\-]?\d+(?:\.\d+)?/g);
-  if (!matches || !matches.length) return null;
-
-  const value = Number(matches[matches.length - 1]);
-  return Number.isFinite(value) ? value : null;
+async function ensureDir(dir) {
+  await fs.mkdir(dir, { recursive: true });
 }
 
-async function acceptCookiesIfNeeded(page) {
-  const possibleButtons = [
-    'button:has-text("Accept")',
-    'button:has-text("Accept all")',
-    'button:has-text("I agree")',
-    'button:has-text("OK")',
-    'button:has-text("Alle akzeptieren")',
-    'button:has-text("Akzeptieren")',
+async function safeClickCookieButtons(page) {
+  const selectors = [
+    /accept/i,
+    /agree/i,
+    /consent/i,
+    /save/i,
+    /close/i,
+    /allow/i,
+    /ok/i
   ];
 
-  for (const selector of possibleButtons) {
-    const btn = page.locator(selector).first();
+  for (const rx of selectors) {
     try {
+      const btn = page.getByRole("button", { name: rx }).first();
       if (await btn.isVisible({ timeout: 1200 })) {
-        await btn.click({ timeout: 1200 });
-        await page.waitForTimeout(800);
-        return;
+        await btn.click({ force: true });
+        await page.waitForTimeout(1500);
+        return true;
       }
-    } catch (_) {}
+    } catch {}
   }
+
+  return false;
 }
 
-async function grabWholeText(page) {
-  return await page.evaluate(() => document.body.innerText || '');
-}
+async function scrapeJustETF(page, url) {
+  const result = {
+    source: "justETF",
+    values: {
+      "1D": null,
+      "5D": null,
+      "1M": null,
+      "3M": null,
+      "YTD": null,
+      "1Y": null,
+      "3Y": null
+    },
+    notes: []
+  };
 
-function extractFromTextBlock(text) {
-  const normalized = normalizeSpaces(text);
-  const result = {};
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(5000);
 
-  for (const [period, labels] of Object.entries(PERIOD_LABELS)) {
-    let found = null;
+  await safeClickCookieButtons(page);
 
-    for (const label of labels) {
-      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try {
+    const chartTitle = page.getByText(/chart/i).first();
+    await chartTitle.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1500);
+  } catch {
+    result.notes.push("Could not scroll to Chart section");
+  }
 
-      const patterns = [
-        new RegExp(`${escaped}\\s*([+\-−]?\\d+[\\.,]?\\d*\\s*%)`, 'i'),
-        new RegExp(`([+\-−]?\\d+[\\.,]?\\d*\\s*%)\\s*${escaped}`, 'i'),
-        new RegExp(`${escaped}[^+\-\d]{0,30}([+\-−]?\\d+[\\.,]?\\d*\\s*%)`, 'i'),
-      ];
+  await page.screenshot({
+    path: "output/justetf-debug-before.png",
+    fullPage: true
+  });
 
-      for (const pattern of patterns) {
-        const match = normalized.match(pattern);
-        if (match?.[1]) {
-          found = parsePct(match[1]);
-          if (found !== null) break;
+  async function clickPeriod(period) {
+    const candidates = [
+      page.getByRole("button", { name: new RegExp(`^${period}$`, "i") }).first(),
+      page.getByText(new RegExp(`^${period}$`, "i")).first(),
+      page.locator(`text="${period}"`).first(),
+      page.locator(`button:has-text("${period}")`).first(),
+      page.locator(`[role="button"]:has-text("${period}")`).first(),
+      page.locator(`a:has-text("${period}")`).first()
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        if (await candidate.isVisible({ timeout: 1500 })) {
+          await candidate.scrollIntoViewIfNeeded();
+          await page.waitForTimeout(500);
+          await candidate.click({ force: true, timeout: 5000 });
+          await page.waitForTimeout(3000);
+          return true;
         }
-      }
-      if (found !== null) break;
+      } catch {}
     }
 
-    result[period] = found;
+    return false;
+  }
+
+  async function extractVisibleLabelValue(labels = []) {
+    const bodyText = await page.locator("body").innerText();
+
+    for (const label of labels) {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(`${escaped}\\s*:?\\s*([+-]?\\d+(?:[.,]\\d+)?)%`, "i");
+      const m = bodyText.match(rx);
+      if (m) {
+        return Number(m[1].replace(",", "."));
+      }
+    }
+
+    return null;
+  }
+
+  const mapping = [
+    { period: "1D", labels: ["1 day", "1D"] },
+    { period: "5D", labels: ["5 days", "5D"] },
+    { period: "1M", labels: ["1 month", "1M"] },
+    { period: "3M", labels: ["3 months", "3M"] },
+    { period: "YTD", labels: ["YTD", "year to date"] },
+    { period: "1Y", labels: ["1 year", "1Y"] },
+    { period: "3Y", labels: ["3 years", "3Y"] }
+  ];
+
+  for (const item of mapping) {
+    const clicked = await clickPeriod(item.period);
+
+    if (!clicked) {
+      result.notes.push(`Could not click justETF period ${item.period}`);
+      continue;
+    }
+
+    await page.screenshot({
+      path: `output/justetf-${item.period}.png`,
+      fullPage: true
+    });
+
+    const value = await extractVisibleLabelValue(item.labels);
+
+    if (value === null) {
+      result.notes.push(`Could not extract justETF value for ${item.period}`);
+    } else {
+      result.values[item.period] = pct(value);
+    }
   }
 
   return result;
 }
 
-async function extractUsingDom(page) {
-  return await page.evaluate((periodLabels) => {
-    function normalizeSpaces(str) {
-      return str.replace(/\s+/g, ' ').trim();
-    }
-
-    function parsePct(text) {
-      if (!text) return null;
-      const cleaned = text
-        .replace(/\u2212/g, '-')
-        .replace(/,/g, '.')
-        .replace(/[^0-9+\-\.]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const matches = cleaned.match(/[+\-]?\d+(?:\.\d+)?/g);
-      if (!matches || !matches.length) return null;
-      const value = Number(matches[matches.length - 1]);
-      return Number.isFinite(value) ? value : null;
-    }
-
-    const all = Array.from(document.querySelectorAll('body *'))
-      .map(el => normalizeSpaces(el.textContent || ''))
-      .filter(Boolean)
-      .filter(txt => txt.length < 120);
-
-    const out = {};
-
-    for (const [period, labels] of Object.entries(periodLabels)) {
-      let value = null;
-
-      for (const label of labels) {
-        const i = all.findIndex(txt => txt.toLowerCase() === label.toLowerCase());
-        if (i >= 0) {
-          const next = all.slice(i + 1, i + 6);
-          for (const candidate of next) {
-            if (candidate.includes('%')) {
-              value = parsePct(candidate);
-              if (value !== null) break;
-            }
-          }
-        }
-        if (value !== null) break;
-      }
-
-      out[period] = value;
-    }
-
-    return out;
-  }, PERIOD_LABELS);
-}
-
-async function scrapeJustEtfByIsin(browser, isin) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 2200 } });
-
-  try {
-    const url = `https://www.justetf.com/en/etf-profile.html?isin=${isin}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(2500);
-    await acceptCookiesIfNeeded(page);
-    await page.waitForTimeout(1500);
-
-    const domResult = await extractUsingDom(page);
-    const text = await grabWholeText(page);
-    const textResult = extractFromTextBlock(text);
-
-    const merged = {};
-    for (const key of Object.keys(PERIOD_LABELS)) {
-      merged[key] = domResult[key] ?? textResult[key] ?? null;
-    }
-
-    const hasEnoughData = Object.values(merged).filter(v => v !== null).length >= 4;
-
-    return {
-      isin,
-      url,
-      source: 'justETF',
-      ok: hasEnoughData,
-      ...merged,
-    };
-  } catch (error) {
-    return {
-      isin,
-      source: 'justETF',
-      ok: false,
-      error: error.message,
-      '1D': null,
-      '5D': null,
-      '1M': null,
-      '3M': null,
-      YTD: null,
-      '1Y': null,
-      '3Y': null,
-    };
-  } finally {
-    await page.close();
-  }
-}
-
 async function main() {
-  if (!ISINS.length) {
-    console.log('Add your ISINs first in the ISINS array.');
-    return;
-  }
+  const outDir = path.join(process.cwd(), "output");
+  await ensureDir(outDir);
 
   const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({
+    viewport: { width: 1600, height: 1400 }
+  });
 
-  try {
-    const results = [];
+  const justetf = await scrapeJustETF(page, config.justetfUrl);
 
-    for (const isin of ISINS) {
-      console.log(`Checking ${isin}...`);
-      const row = await scrapeJustEtfByIsin(browser, isin);
-      results.push(row);
-    }
+  await browser.close();
 
-    console.table(
-      results.map(r => ({
-        isin: r.isin,
-        ok: r.ok,
-        '1D': r['1D'],
-        '5D': r['5D'],
-        '1M': r['1M'],
-        '3M': r['3M'],
-        YTD: r.YTD,
-        '1Y': r['1Y'],
-        '3Y': r['3Y'],
-      }))
-    );
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    etf: {
+      name: config.name,
+      isin: config.isin
+    },
+    results: [justetf]
+  };
 
-    fs.writeFileSync('justetf-periods-output.json', JSON.stringify(results, null, 2));
-    console.log('\nSaved: justetf-periods-output.json');
-  } finally {
-    await browser.close();
-  }
+  await fs.writeFile(
+    path.join(outDir, "justetf-results.json"),
+    JSON.stringify(payload, null, 2),
+    "utf8"
+  );
+
+  const rows = [
+    ["Source", "1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "Notes"],
+    ...payload.results.map(r => [
+      r.source,
+      r.values["1D"] ?? "",
+      r.values["5D"] ?? "",
+      r.values["1M"] ?? "",
+      r.values["3M"] ?? "",
+      r.values["YTD"] ?? "",
+      r.values["1Y"] ?? "",
+      r.values["3Y"] ?? "",
+      (r.notes || []).join(" | ")
+    ])
+  ];
+
+  const csv = rows
+    .map(row =>
+      row
+        .map(cell => `"${String(cell).replace(/"/g, '""')}"`)
+        .join(",")
+    )
+    .join("\n");
+
+  await fs.writeFile(
+    path.join(outDir, "justetf-results.csv"),
+    csv,
+    "utf8"
+  );
+
+  console.log(JSON.stringify(payload, null, 2));
 }
 
 main().catch(err => {
