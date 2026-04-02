@@ -1,0 +1,127 @@
+{
+  "generatedAt": "2026-04-02T13:44:34.902Z",
+  "results": [
+    {
+      "source": "justETF",
+      "name": "MSCI World",
+      "isin": "IE00B4L5Y983",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00B4L5Y983",
+      "values": {
+        "1D": -1.07,
+        "1M": -3.13,
+        "3M": -1.4,
+        "YTD": -0.7,
+        "1Y": 11.81,
+        "3Y": 51.95
+      },
+      "notes": []
+    },
+    {
+      "source": "justETF",
+      "name": "MSCI World Value",
+      "isin": "IE00BP3QZB59",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00BP3QZB59",
+      "values": {
+        "1D": -1.26,
+        "1M": -3.05,
+        "3M": 6.93,
+        "YTD": 6.93,
+        "1Y": 28.96,
+        "3Y": 65.99
+      },
+      "notes": []
+    },
+    {
+      "source": "justETF",
+      "name": "Emerging Markets",
+      "isin": "IE00BKM4GZ66",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00BKM4GZ66",
+      "values": {
+        "1D": -2.28,
+        "1M": -6.97,
+        "3M": 5.82,
+        "YTD": 5.98,
+        "1Y": 24.8,
+        "3Y": 48.63
+      },
+      "notes": []
+    },
+    {
+      "source": "justETF",
+      "name": "Gold",
+      "isin": "IE00B4ND3602",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00B4ND3602",
+      "values": {
+        "1D": -2.47,
+        "1M": -7.06,
+        "3M": 9.84,
+        "YTD": 12.11,
+        "1Y": 41.4,
+        "3Y": 125.08
+      },
+      "notes": []
+    },
+    {
+      "source": "justETF",
+      "name": "Government Bond",
+      "isin": "IE00B14X4Q57",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00B14X4Q57",
+      "values": {
+        "1D": -0.08,
+        "1M": -1.89,
+        "3M": -1.34,
+        "YTD": -1.34,
+        "1Y": -0.95,
+        "3Y": 1.76
+      },
+      "notes": []
+    },
+    {
+      "source": "justETF",
+      "name": "Euro Corporate Bond",
+      "isin": "IE00B3F81R35",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00B3F81R35",
+      "values": {
+        "1D": -0.09,
+        "1M": -1.77,
+        "3M": -2.25,
+        "YTD": -2.25,
+        "1Y": -0.96,
+        "3Y": 3.06
+      },
+      "notes": []
+    },
+    {
+      "source": "justETF",
+      "name": "Defence Tech",
+      "isin": "IE000JCW3DZ3",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE000JCW3DZ3",
+      "values": {
+        "1D": -0.73,
+        "1M": 0.35,
+        "3M": 14.62,
+        "YTD": 15.5,
+        "1Y": 48.37,
+        "3Y": null
+      },
+      "notes": [
+        "Could not extract justETF value for 3Y"
+      ]
+    },
+    {
+      "source": "justETF",
+      "name": "AI & Big Data",
+      "isin": "IE00BGV5VN51",
+      "url": "https://www.justetf.com/en/etf-profile.html?isin=IE00BGV5VN51",
+      "values": {
+        "1D": -2.32,
+        "1M": -2.65,
+        "3M": -4.62,
+        "YTD": -3.75,
+        "1Y": 20.27,
+        "3Y": 99.29
+      },
+      "notes": []
+    }
+  ]
+}
